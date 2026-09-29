@@ -1,0 +1,6 @@
+# dsh-media-gen —— bundle 自挂载声明（fork 合并自 dsh-image-generation 与 dsh-video-gen，均 MIT）
+# 安装：dsh plugin --profile <name> add link:<本目录绝对路径>
+# 单一 loader 条目 `media-gen`：host 半在 lib/index.js，client 半由 package.json 的 dsh.client 声明发现。
+- insert:
+    - id: media-gen
+      name: dsh-media-gen

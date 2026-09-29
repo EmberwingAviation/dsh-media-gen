@@ -1,0 +1,11 @@
+{
+  "base": "https://www.yotopivot.top/v1",
+  "outDir": "C:/dsh/generate/image",
+  "defaultModel": "qwen-image-3.0-pro",
+  "defaultSize": "1024x1024",
+  "timeoutMs": 180000,
+  "keyByModel": [
+    { "pattern": "^gpt-image", "keyEnv": "IMAGE_GEN_GPT_API_KEY" }
+  ],
+  "defaultKeyEnv": "QWEN_TOB_API_KEY"
+}
