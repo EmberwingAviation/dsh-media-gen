@@ -34,8 +34,10 @@ License: **MIT**（含上游 MIT 代码，保留其版权声明）。
 ## 安装
 
 ```sh
-# GitHub（发布后）
-dsh plugin --profile <name> add github:<owner>/dsh-media-gen
+# npm（发布后）
+dsh plugin --profile <name> add dsh-media-gen
+# GitHub
+dsh plugin --profile <name> add github:EmberwingAviation/dsh-media-gen
 # 本地开发（硬链接，改源码即同步副本）
 dsh plugin --profile <name> add link:<本仓库绝对路径>
 # 物理副本
