@@ -4,173 +4,183 @@
 [![npm](https://img.shields.io/npm/v/dsh-media-gen)](https://www.npmjs.com/package/dsh-media-gen)
 [![license](https://img.shields.io/npm/l/dsh-media-gen)](LICENSE)
 
-DeepSeek Harness（DSH）**生图 + 生视频整合插件**：一个插件、一套设置页、三个工具、多条供应商通道。
+**让 DeepSeek Harness 会画图、会出片。** 一个插件、一套设置页、三个工具、多条供应商通道。
 
-Fork 合并自两个 MIT 项目（版权归属见 [NOTICE.md](NOTICE.md) 与 [vendor/](vendor/)）：
-
-- [dsh-image-generation](https://github.com/whiteS18/dsh-image-generation)（whiteS18）— 生图 host/client 核心
-- `dsh-video-gen@0.2.4`（Yang-wudi，原仓库已不可达，npm 仅存包）— 生视频 host/client 核心
-
-License: **MIT**（含上游 MIT 代码，保留其版权声明）。
+> Unified image + video generation for DeepSeek Harness — `image_generate` / `generate_video` / `animate_image`,
+> multi-provider (OpenAI-compatible relays, DashScope 通义万相, Volcengine Seedance, Google Veo, Sora-style `/v1/videos`),
+> settings UI, video gallery, MIT.
 
 ---
 
-## 功能
+## 效果
 
-| 工具 | 说明 |
-|---|---|
-| `image_generate` | 文生图 / 参考图编辑（`referenceImages` 1–5 张附件引用）；落盘 `generate/image/` 并对话内联 |
-| `generate_video` | 文生视频（异步任务 + 轮询）；落盘 `generate/video/`、对话内播放、收录视频画廊 |
-| `animate_image` | 图生视频（工作区文件 / 对话附件 / 最新对话图片三种源） |
+下面两张图都是**用本插件生成**的（`image_generate`，gpt-image-2 / qwen-image-3.0-pro）：
 
-- **多供应商目录**：生图按供应商配 API 格式（`openai-images` / `xai-images` / `gemini-image` / `openai-chat-image`）；
-  生视频按目录条目配 kind（`dashscope` / `volcengine` / `google` / `openai-compatible`），默认选择 + 工具 `provider` 参数单次覆盖
-- **openai-compatible 图生视频**：经 `input_reference`（data URL）传源图（New API 系中转实测会转存 OSS 后转发上游）
-- **限流纪律**：`limit_requests` / 429 / 饱和类错误指数退避（≥60s 起步，可配），禁止即时重试；非限流错误绝不重试
-- **任务登记簿**：openai-compatible 通道超时/失败后**先查旧任务再决定重提**（completed→直接取旧结果；failed→重提；
-  进行中→拒绝重提并报状态），`resubmit=true` 可强制新任务
-- **Agent 出图通道开关**（`imageLane`）：`auto` / `cli` / `tool` / `subagent`，写入 CLI 镜像并由系统提示词策略段约束 Agent 行为
-- **快车道 CLI**：`scripts/gen-image.mjs` 免 Agent 回合直连出图；配置由 GUI 镜像驱动（见下）
-- **设置页**：`生图`（供应商目录卡 + 默认配置卡合并一页）与 `视频生成` 两个导航页；会话顶栏 `视频画廊` Tab；
-  对话流内 image/video toolview 内联卡片
-- 密钥一律走 DSH 凭据服务（`credential-ref`），不进配置文件/命令行/浏览器
+<p align="center">
+  <img src="https://raw.githubusercontent.com/EmberwingAviation/dsh-media-gen/main/docs/preview-image.jpg" width="300" alt="生成示例：电影海报">
+  &nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/EmberwingAviation/dsh-media-gen/main/docs/preview-logo.jpg" width="220" alt="生成示例：矢量 logo">
+</p>
 
-## 安装
+---
+
+## 30 秒上手
+
+**1. 安装插件**
 
 ```sh
-# npm（发布后）
-dsh plugin --profile <name> add dsh-media-gen
-# GitHub
-dsh plugin --profile <name> add github:EmberwingAviation/dsh-media-gen
-# 本地开发（硬链接，改源码即同步副本）
-dsh plugin --profile <name> add link:<本仓库绝对路径>
-# 物理副本
-dsh plugin --profile <name> add file:<本仓库绝对路径>
+dsh plugin --profile desktop add dsh-media-gen
 ```
 
-安装后**完全重启 DSH**（插件在进程启动时组合；host 模块缓存不会因热切换重导入已加载模块）。
+> 也可以从 GitHub 装：`dsh plugin --profile desktop add github:EmberwingAviation/dsh-media-gen`
 
-兼容：DSH ≥ 0.1.6（configForms / volatile Config 模式）；在 **0.2.0-rc.1 Desktop** 实测激活。
-peer 依赖为开放区间（上游 dsh-video-gen 的 `<0.2.0` 封顶在 0.2 宿主会被安装拦截，本项目已放宽）。
+**2. 完全重启 DSH**（插件在启动时装载）
 
-## 配置
+**3. 填一个生图供应商** → 设置 → **生图** → 供应商目录卡 → 新建：
+- 名称、Base URL（如 `https://你的中转站/v1`）、API 格式（多数中转站选 `openai-images`）
+- 密钥（写入 DSH 凭据服务，不会明文存配置文件）
+- 模型列表：可以点 **「拉取上游模型」** 一键从上游 `GET /models` 拉取候选
 
-### 设置 → 生图（合并页）
+**4. 选默认模型** → 同一页的默认配置卡 → 当前模型选一个（`image_generate` 就跟着它走）
 
-1. **供应商目录卡**：增删改供应商（名称 / Base URL / API 格式 / Key / 模型列表）；
-   「拉取上游模型」按钮经 host loopback RPC 调 `GET {baseUrl}/models`（凭据在服务端解析，密钥不进浏览器），去重合并进模型列表
-2. **默认配置卡**：启用开关、当前模型（`image_generate` 跟随）、默认尺寸/质量、
-   **Agent 出图通道**、命令行出图输出目录、命令行出图请求超时
+**5.（可选）配视频** → 设置 → **视频生成** → 加供应商（类型 / Base URL / 模型 / 密钥 / 是否支持图生视频）
+
+**6. 开始用** —— 新建一个会话，直接对 Agent 说：
+
+> 「画一只在深夜海面上跃起的座头鲸，电影海报风格」
+> 「把这张图做成 5 秒视频」（附图）
+> 「生成一段视频：赛博朋克城市雨夜，镜头缓慢推进」
+
+> ⚠️ **工具只在新建的会话里出现**：DSH 的会话工具集在会话创建时快照，装完插件后请**开新会话**。
+
+---
+
+## 你会得到什么
+
+| 工具 | 做什么 |
+|---|---|
+| `image_generate` | 文生图、**参考图改图**（`referenceImages` 传 1–5 张对话里的图）；结果存 `generate/image/` 并**直接显示在对话里** |
+| `generate_video` | 文生视频（异步任务 + 自动轮询）；结果存 `generate/video/`、**对话内播放**，并收录进**视频画廊** |
+| `animate_image` | 图生视频：源图可以是工作区文件、对话附件、或"对话里最新那张图" |
+
+产物都在工作区的 `generate/` 下，随时可再引用；视频还能在会话顶栏的 **视频画廊** 里回看。
+
+---
+
+## 支持哪些服务商
+
+**生图**（按供应商选择 API 格式）：
+
+| 格式 | 适用 |
+|---|---|
+| `openai-images` | OpenAI 官方、以及绝大多数 New API 系中转站的 `/v1/images/generations`（推荐） |
+| `openai-chat-image` | 只提供 chat 路由携图的中转站（兼容兜底） |
+| `xai-images` / `gemini-image` | xAI、Google Gemini 系原生格式 |
+
+**生视频**（按供应商选择类型）：
+
+| 类型 | 说明 | 图生视频 |
+|---|---|---|
+| `dashscope` | 阿里云通义万相 | ✅ 默认支持 |
+| `volcengine` | 火山引擎 Seedance | ✅ 默认支持 |
+| `google` | Google Veo | ✅ 默认支持 |
+| `openai-compatible` | OpenAI / Sora 风格 `/v1/videos` 异步任务，含各类中转站 | ⚠️ 需手动勾选「支持图生视频」（经 `input_reference` 传图） |
+
+同一条通道可配多个模型，默认供应商在设置页单选；单次调用还可用工具参数 `provider` 临时换。
+
+---
+
+## 配置详解
+
+### 设置 → 生图（一页两卡）
+
+- **供应商目录卡**：增删改供应商（名称 / Base URL / API 格式 / Key / 模型列表），每行有密钥状态徽章；
+  「拉取上游模型」按钮会带着你填的密钥向 `GET {BaseURL}/models` 请求，把返回的模型 id 去重合并进列表
+- **默认配置卡**：
+  - **启用 image_generate**：关掉后工具会拒答
+  - **当前模型**：`image_generate` 实际使用的模型
+  - **默认尺寸 / 默认质量**：不给参数时用这套
+  - **Agent 出图通道**：`auto`（默认，简单出图走命令行、需要参考图/内联/画廊时走原生工具）／`cli`／`tool`／`subagent`
+  - **命令行出图输出目录 / 请求超时**：给下面的命令行工具用
 
 ### 设置 → 视频生成
 
-供应商目录（kind / Base URL / 模型 + 拉取候选 / Key / i2v 开关）、默认供应商单选、轮询间隔、等待超时、落盘目录。
-i2v 语义：原生三家 kind 默认支持；`openai-compatible` 默认关闭、需显式勾选（经 `input_reference` 传图）。
+供应商目录（类型 / Base URL / 模型 / Key / 图生视频开关）、**默认供应商单选**、轮询间隔、等待超时、落盘目录。
 
-### 预填示例（profile `cordis.patch.yml`）
+### 密钥放哪
 
-```yaml
-- id: media-gen
-  name: dsh-media-gen
-  config:
-    enabled: true
-    providerId: my-relay
-    modelId: qwen-image-3.0-pro
-    providers:
-      - id: my-relay
-        name: 我的中转站
-        baseUrl: https://example.com/v1
-        apiFormat: openai-images
-        apiKeyEnv: MY_RELAY_KEY
-        models:
-          - { id: qwen-image-3.0-pro, name: qwen-image-3.0-pro }
-    videoEnabled: true
-    videoProviderId: relay-t2v
-    waitTimeoutMs: 1200000
-    videoProviders:
-      - id: relay-t2v
-        name: 中转 文生视频
-        kind: openai-compatible
-        baseUrl: https://example.com/v1
-        model: some-t2v-model
-        apiKeyEnv: MY_RELAY_KEY
-        i2v: false
-      - id: relay-i2v
-        name: 中转 图生视频
-        kind: openai-compatible
-        baseUrl: https://example.com/v1
-        model: some-i2v-model
-        apiKeyEnv: MY_RELAY_KEY
-        i2v: true
-```
+所有 Key 都交给 DSH 凭据服务（配置里只存引用名），**不会明文写进配置文件、不会传进浏览器、不会进命令行**。
 
-## 快车道 CLI 与配置镜像
+---
+
+## 命令行直连出图（可选）
+
+不想经过 Agent 回合、想最快拿到图：
 
 ```sh
-node scripts/gen-image.mjs "提示词" [--model M] [--size S] [--key-env E] [--base B] [--out D] [--config P] [--timeout MS] [--dry-run]
+node scripts/gen-image.mjs "提示词" [--model qwen-image-3.0-pro] [--size 1024x1024] [--dry-run]
 ```
 
-- **GUI 是唯一编辑面**：设置卡保存时 host 经 `sync-cli-config` RPC 把解析后的生效配置原子写成镜像
-  `~/.dsh/gen-image.config.json`（只含凭据 ref 名，不含密钥值）；CLI 优先读镜像
-- 优先级：命令行 flag > GUI 镜像 > 仓库 `gen-image.config.json` > 内置默认
-- host 未重启（新 RPC 未生效）时用 `node scripts/sync-cli-mirror.mjs` 从 profile patch 离线重建镜像
-- `imageLane` 语义：`auto`=简单出图走 CLI、参考图/内联/画廊走原生工具；`cli`=一律 CLI；`tool`=一律原生工具；
-  `subagent`=一律经子代理隔离调用
+- 默认值来自「设置 → 生图」保存的配置（host 会把它同步成配置文件镜像），命令行参数可临时覆盖
+- `--dry-run` 只打印生效配置，不消耗额度
+- 参数、优先级、镜像机制见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
-## 中转站契约实测备忘（New API 系网关）
+---
 
-- 生图：`/v1/images/generations`（OpenAI 形状）；chat 路由携图（`openai-chat-image`）与 images 路由**限流池独立**，优选 images
-- 生视频：Sora 风格 `POST /v1/videos` → `GET /v1/videos/{id}` 轮询；状态词 `queued/in_progress/completed/failed`；
-  成功态 URL 位置实测三种：顶层 `video_url` / `output.video_url` / `metadata.url`（适配器三级兜底）
-- i2v：`input_reference` 传 data URL（网关转存后转发）；非法引用任务 failed 且不计费
-- 拥堵期任务可能长时间停滞（实测 wan 系卡 30% 近一小时）——登记簿 + 20 分钟超时即为此设计
+## 常见问题
 
-## 开发
+**Q：为什么新会话里才有这三个工具？**
+DSH 的会话工具集在会话创建时快照，装完插件或改了工具开关，**新开一个会话**即可。
+
+**Q：报 429 / 限流 / "负载已饱和"怎么办？**
+插件会自动指数退避重试（默认 ≥60 秒起步，最多 3 次），**不要手动连发**；上游拥堵时等一会儿或换个供应商。
+
+**Q：视频任务一直转圈？**
+异步视频任务偶尔会长时间停滞（上游排队）。插件会保留任务 id：超时后**先查旧任务**，而不是盲目重提；
+确实要开新任务时，明确说「重提」或让 Agent 传 `resubmit`。
+
+**Q：图/视频存哪了？**
+工作区 `generate/image/`、`generate/video/`；图片会内联在对话里，视频同时出现在**视频画廊**。
+
+**Q：改了设置要重启吗？**
+改配置（供应商、模型、开关）**不用**重启；安装/升级插件、改插件自身代码需要**重启 DSH**。
+
+**Q：图生视频为什么提示不支持？**
+`openai-compatible` 类型默认关闭图生视频（不同中转站能力不一），到「视频生成」页把该供应商的「支持图生视频」勾上。
+
+---
+
+## 反馈与贡献
+
+- 遇到问题或有需求：开 [Issue](https://github.com/EmberwingAviation/dsh-media-gen/issues)
+- 开发、架构、测试、发布流程：见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+
+---
+
+## English quick start
 
 ```sh
-node scripts/patch-client-video.mjs   # 一次性 codemod：vendor 视频 client → 本项目版本（幂等，已入库）
-node scripts/build-client.mjs         # 合并两个 client 半 → lib/client.js（确定性，单模块 IIFE 隔离）
-npm run check                         # node --check 全部模块
-npm test                              # node:test（34 项）
+dsh plugin --profile desktop add dsh-media-gen   # restart DSH afterwards
 ```
 
-测试含三道回归门：**import-graph 链接完整性**（改文件名漏改导入会红——曾因此事故排查数小时）、
-限流退避序列与"非限流不重试"纪律、任务登记簿决策表。
+Then go to **Settings → Image generation**: add a provider (Base URL / key / models), pick a default model, and ask the
+agent in a **new session**:
 
-### 结构
+> "Draw a humpback whale breaching at night, movie-poster style"
 
-```
-lib/index.js            合并 host 入口（单一 loader 条目 media-gen）
-lib/media-config.js     统一 volatile Config + resolveVideoEntry（纯逻辑，可单测）
-lib/image-core.js       生图 host（上游 dsh-image-generation 适配）
-lib/video-core.js       生视频 host（上游 dsh-video-gen 适配 + 登记簿 + 退避）
-lib/video-*.js          视频适配器/共享件（google/shared/reference-image）
-lib/rate-limit.js       限流识别 + 指数退避
-lib/video-tasks.js      任务登记簿（先查旧任务再重提）
-lib/cli-config.js       CLI 镜像构造/原子写
-lib/client-image.js     生图 client（设置页/工具视图/画廊 RPC）
-lib/client-video.js     视频 client（设置卡/工具视图/视频画廊 IndexedDB）
-lib/client.js           合并 client 入口（build-client.mjs 生成，勿手改）
-scripts/parts/          patch-client-video.mjs 的替换部件
-vendor/                 上游源码副本 + LICENSE（归属证据）
-```
+Three tools are exposed: `image_generate` (text-to-image and reference-image edits), `generate_video` (text-to-video,
+async polling) and `animate_image` (image-to-video). Outputs land in `generate/image/` and `generate/video/`, inline in the
+conversation, with a video gallery tab. Keys are stored through the DSH credential service — never in config files.
 
-## 已知问题 / 上游缺陷候选
-
-- **client 图"移除行后再添加行"同步失配**（dsh-client-hmr SSE）：bundle 开关后活页面可能丢 client 行，
-  需整页重载恢复；配套工具插件 `dsh-page-reload`（F5/Ctrl+R 拦截 + 侧栏重载按钮）可免重启自愈
-- **host 模块缓存**：已成功导入的模块不因 bundle 开关重导入——host 代码改动需重启 DSH 生效
-  （client 代码改动可经 rebuilt 帧热替换）
-- DSH Desktop 壳不提供重载加速器（F5 无效），仅拦截 F12
+---
 
 ## Attribution & License
 
-MIT © dsh-media-gen contributors。本插件为两个上游 MIT 项目的 fork 合并与再创作：
+MIT © dsh-media-gen contributors. 本插件是以下两个 MIT 项目的 fork 合并与再创作：
 
 | 上游 | 版权 | 使用范围 |
 |---|---|---|
 | [dsh-image-generation](https://github.com/whiteS18/dsh-image-generation) @0.1.2 | whiteS18, MIT | `lib/image-core.js`、`lib/client-image.js` |
 | `dsh-video-gen` @0.2.4（npm） | Yang-wudi / shanliuling, MIT | `lib/video-core.js`、`lib/video-*.js`、`lib/client-video.js` |
 
-完整声明见 [NOTICE.md](NOTICE.md)；上游 LICENSE 与源码副本保留于 [vendor/](vendor/)；
-各改编文件头部均有来源注释；合并 client 生成物头部含归属说明。
+完整声明见 [NOTICE.md](NOTICE.md)；上游 LICENSE 与源码副本保留于 [vendor/](vendor/)；各改编文件头部均有来源注释。
