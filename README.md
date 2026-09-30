@@ -1,5 +1,9 @@
 # dsh-media-gen
 
+[![test](https://github.com/EmberwingAviation/dsh-media-gen/actions/workflows/test.yml/badge.svg)](https://github.com/EmberwingAviation/dsh-media-gen/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/dsh-media-gen)](https://www.npmjs.com/package/dsh-media-gen)
+[![license](https://img.shields.io/npm/l/dsh-media-gen)](LICENSE)
+
 DeepSeek Harness（DSH）**生图 + 生视频整合插件**：一个插件、一套设置页、三个工具、多条供应商通道。
 
 Fork 合并自两个 MIT 项目（版权归属见 [NOTICE.md](NOTICE.md) 与 [vendor/](vendor/)）：

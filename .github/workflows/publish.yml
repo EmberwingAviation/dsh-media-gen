@@ -1,0 +1,32 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC for npm Trusted Publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Install dev dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Rebuild merged client and assert it is committed
+        run: |
+          node scripts/build-client.mjs
+          git diff --exit-code -- lib/client.js
+      - name: Syntax check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Publish to npm (no token: npm Trusted Publishing via GitHub OIDC)
+        run: npm publish --access public

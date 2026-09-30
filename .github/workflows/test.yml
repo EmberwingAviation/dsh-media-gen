@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dev dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Rebuild merged client and assert it is committed
+        run: |
+          node scripts/build-client.mjs
+          git diff --exit-code -- lib/client.js
+      - name: Syntax check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
