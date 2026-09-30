@@ -12,18 +12,6 @@
 
 ---
 
-## 效果
-
-下面两张图都是**用本插件生成**的（`image_generate`，gpt-image-2 / qwen-image-3.0-pro）：
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/EmberwingAviation/dsh-media-gen/main/docs/preview-image.jpg" width="300" alt="生成示例：电影海报">
-  &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/EmberwingAviation/dsh-media-gen/main/docs/preview-logo.jpg" width="220" alt="生成示例：矢量 logo">
-</p>
-
----
-
 ## 30 秒上手
 
 **1. 安装插件**
