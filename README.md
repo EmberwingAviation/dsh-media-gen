@@ -14,13 +14,21 @@
 
 ## 30 秒上手
 
-**1. 安装插件**
+**1. 安装插件**（三种渠道任选，推荐 npm）
 
 ```sh
+# ① npm（推荐，自动跟随最新版）
 dsh plugin --profile desktop add dsh-media-gen
+
+# ② GitHub 仓库直装
+dsh plugin --profile desktop add github:EmberwingAviation/dsh-media-gen
+
+# ③ 本地源码（开发用，改源码即生效）
+dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 ```
 
-> 也可以从 GitHub 装：`dsh plugin --profile desktop add github:EmberwingAviation/dsh-media-gen`
+> npm 包页：https://www.npmjs.com/package/dsh-media-gen ｜ 安装后可在「设置 → 内置插件」列表里看到 `dsh-media-gen` 与版本号
+> 升级：重复执行同一条安装命令即可取到最新版（升级后需重启 DSH）
 
 **2. 完全重启 DSH**（插件在启动时装载）
 
