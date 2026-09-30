@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # OIDC for npm Trusted Publishing + provenance
+  id-token: write # OIDC for npm Trusted Publishing and provenance
 
 jobs:
   publish:
@@ -28,5 +28,5 @@ jobs:
         run: npm run check
       - name: Unit tests
         run: npm test
-      - name: Publish to npm (no token: npm Trusted Publishing via GitHub OIDC)
+      - name: Publish to npm via Trusted Publishing (OIDC, no token)
         run: npm publish --access public
