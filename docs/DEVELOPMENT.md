@@ -69,6 +69,14 @@ node scripts/sync-cli-mirror.mjs   # host 未重启（新 RPC 未生效）时，
 
 ## 已知问题 / 上游缺陷候选
 
+- **connection RPC 通道在 DSH 0.2.0-rc.2 静默缺失**（本插件 0.1.3 已绕过）：
+  `ctx.inject(['connection'], …)` 拿到的 scoped context 访问不到 `webServer`，connection 服务内部
+  `owner.webServer.register(route)` 因此抛错 → `rpc.handle('/image-gen', …)` 从未注册成功，
+  客户端表现为 `transport failure for /image-gen/models: HTTP 405`
+  （405 = webserver 对"无匹配路由的 POST"的统一响应；GET 才是 404，可用它区分"路由缺失"和"方法不对"）。
+  绕法：`lib/rpc-route.js` 在插件自己的 webServer 上按**同一路径/方法/信封协议**自注册
+  （POST `/{channel}/{endpoint}` + `{type:'client-request',rpcId,method,payload}`），客户端零改动。
+  诊断日志：`~/.dsh/media-gen-rpc.log`
 - **client 图"移除行后再添加行"同步失配**（dsh-client-hmr SSE）：bundle 开关后活页面可能丢 client 行，需整页重载恢复；
   配套工具插件 `dsh-page-reload`（F5/Ctrl+R 拦截 + 侧栏重载按钮）可免重启自愈
 - **host 模块缓存**：已成功导入的模块不因 bundle 开关重导入 —— host 代码改动需**重启 DSH** 才生效；client 代码改动可经 rebuilt 帧热替换
