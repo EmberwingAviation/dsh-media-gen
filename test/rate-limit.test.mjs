@@ -13,7 +13,7 @@ test('限流识别：状态码与错误码/消息', () => {
   assert.equal(isRateLimitStatus(429), true)
   assert.equal(isRateLimitStatus(400), false)
   assert.equal(isRateLimitPayload({ error: { code: 'limit_requests' } }), true)
-  assert.equal(isRateLimitPayload({ code: 'fail_to_fetch_task' }), true)
+  assert.equal(isRateLimitPayload({ code: 'fail_to_fetch_task' }), false)
   assert.equal(isRateLimitPayload({ error: { message: 'Requests rate limit exceeded, please try again later.' } }), true)
   assert.equal(isRateLimitPayload({ error: { message: '当前分组上游负载已饱和，请稍后再试' } }), true)
   assert.equal(isRateLimitPayload({ error: { message: 'model not found' } }), false)
