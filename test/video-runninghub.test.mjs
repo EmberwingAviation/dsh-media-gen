@@ -6,6 +6,7 @@ import {
 	buildRunningHubPayload,
 	imageFieldForRoute,
 	normalizeRunningHubRoute,
+	submitRunningHubTask,
 } from "../lib/video-runninghub.js";
 
 test("路由规整：去掉 /openapi/v2 前缀与首尾斜杠", () => {
@@ -72,6 +73,28 @@ test("图生视频参数：按模型把源图放到正确字段", () => {
 		sourceUrl: "https://example.com/a.jpg",
 	});
 	assert.deepEqual(reference.imageUrls, ["https://example.com/a.jpg"]);
+});
+
+test("提交走 /openapi/v2/<route>（回归：曾漏掉前缀导致 401）", async () => {
+	const calls = [];
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async (url, init) => {
+		calls.push({ url: String(url), body: init?.body });
+		return new Response(JSON.stringify({ taskId: "t-1", status: "RUNNING" }), { status: 200 });
+	};
+	try {
+		const taskId = await submitRunningHubTask({
+			base: "https://www.runninghub.cn",
+			apiKey: "k",
+			route: "kling-v2.6-std/text-to-video",
+			payload: { prompt: "x" },
+		});
+		assert.equal(taskId, "t-1");
+		assert.equal(calls.length, 1);
+		assert.equal(calls[0].url, "https://www.runninghub.cn/openapi/v2/kling-v2.6-std/text-to-video");
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
 });
 
 test("motion-control 明确拒绝（media-gen 不提供驱动视频）", async () => {
