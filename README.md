@@ -74,6 +74,7 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 | `openai-images` | OpenAI 官方、以及绝大多数 New API 系中转站的 `/v1/images/generations`（推荐） |
 | `openai-chat-image` | 只提供 chat 路由携图的中转站（兼容兜底） |
 | `xai-images` / `gemini-image` | xAI、Google Gemini 系原生格式 |
+| `runninghub` | RunningHub 标准模型 API（`/openapi/v2/<model>`）；模型填路由，如 `seedream-v5-pro/text-to-image`，编辑类用 `seedream-v5-pro/image-to-image` |
 
 **生视频**（按供应商选择类型）：
 
@@ -102,10 +103,17 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
   - **Agent 出图通道**：`auto`（默认，简单出图走命令行、需要参考图/内联/画廊时走原生工具）／`cli`／`tool`／`subagent`
   - **命令行出图输出目录 / 请求超时**：给下面的命令行工具用
 
+#### RunningHub 图像通道
+
+- API 格式选 `runninghub`；Base URL 留空即 `https://www.runninghub.cn`
+- 在「模型列表」里填路由，例如 `seedream-v5-pro/text-to-image`（文生图）、`seedream-v5-pro/image-to-image`（参考图改图）
+- Key 引用 `RH_KEY_SHARED`
+- ⚠️ `rhart-image-g/*`、`rhart-image-n-g31-flash-lite*` 一类 CN 自研图像模型**已在 CN 节点下线**，提交会返回 `40310`；请用 seedream / 千问 / 全能图片 V2 等模型
+- 计费走 RunningHub 余额（例：seedream-v5-pro 约 0.27/张）
+
 ### 设置 → 视频生成
 
 供应商目录（类型 / Base URL / 模型 / Key / 图生视频开关）、**默认供应商单选**、轮询间隔、等待超时、落盘目录。
-
 #### RunningHub 通道：model 填「路由」
 
 - 类型选「RunningHub（标准模型 API）」；Base URL 留空即 `https://www.runninghub.cn`
