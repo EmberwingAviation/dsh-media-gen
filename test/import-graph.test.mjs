@@ -49,6 +49,7 @@ test('lib/ 命名 import 在被引模块中确有导出', () => {
         if (!name) continue
         const exported = targetSrc.includes(`export function ${name}`)
           || targetSrc.includes(`export async function ${name}`)
+          || targetSrc.includes(`export class ${name}`)
           || targetSrc.includes(`export const ${name}`)
           || targetSrc.includes(`export {\n\t${name},`)
           || new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`, 's').test(targetSrc)

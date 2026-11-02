@@ -41,6 +41,19 @@ test('Config：视频目录条目缺省字段被补全', () => {
   assert.equal(entry.i2v, undefined, 'i2v 保持缺省，由 kind 推断')
 })
 
+test('video models persist through schema round-trip and active model controls generation', () => {
+  const models = ['wan3.0-video', 'wan3.0-video-prime', 'doubao-seedance-2-0-260128']
+  const parsed = Config({ videoProviders: [{ id: 'wan', model: models[1], models, apiKeyEnv: 'SHARED_KEY' }], videoProviderId: 'wan' })
+  const rows = unwrapVolatile(parsed.videoProviders)
+  const reopened = unwrapVolatile(Config(JSON.parse(JSON.stringify({ videoProviders: rows }))).videoProviders)
+  assert.deepEqual(reopened[0].models, models)
+  assert.equal(resolveVideoEntry({ videoProviders: reopened }).model, models[1])
+  const switched = reopened.map(row => ({ ...row, model: models[2] }))
+  assert.equal(resolveVideoEntry({ videoProviders: switched }).model, models[2])
+  assert.equal(reopened[0].apiKeyEnv, 'SHARED_KEY')
+  assert.deepEqual(unwrapVolatile(Config({ videoProviders: [{ id: 'legacy', model: 'old-model' }] }).videoProviders)[0].models, [])
+})
+
 test('Config：生图供应商条目保持上游形状', () => {
   const parsed = Config({
     providers: [{ id: 'p', name: 'P', baseUrl: 'https://x/v1', apiKeyEnv: 'X_KEY', models: [{ id: 'm', name: 'M' }] }],
