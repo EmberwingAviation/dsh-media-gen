@@ -4,11 +4,15 @@
 [![npm](https://img.shields.io/npm/v/dsh-media-gen)](https://www.npmjs.com/package/dsh-media-gen)
 [![license](https://img.shields.io/npm/l/dsh-media-gen)](LICENSE)
 
-**让 DeepSeek Harness 会画图、会出片。** 一个插件、一套设置页、三个工具、多条供应商通道。
+**让 DeepSeek Harness 会画图、会出片。** 一个插件，统一生图、生视频、模型配置和任务恢复。
 
 > Unified image + video generation for DeepSeek Harness — `image_generate` / `generate_video` / `animate_image`,
 > multi-provider (OpenAI-compatible relays, DashScope 通义万相, Volcengine Seedance, Google Veo, Sora-style `/v1/videos`),
-> settings UI, video gallery, MIT.
+> per-model configuration, custom JSON protocols, persistent task recovery, video gallery, MIT.
+
+**当前版本：[v0.2.0](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.0)** · [npm 安装版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.0)
+
+本版新增模型独立配置与删除、供应商高级映射、无费用请求预览，以及跨会话任务查询恢复。
 
 ---
 
@@ -17,22 +21,22 @@
 **1. 安装插件**（三种渠道任选，推荐 npm）
 
 ```sh
-# ① npm 注册表（推荐，自动跟随最新版）
+# ① npm 注册表（推荐，安装当前可用版本）
 dsh plugin --profile desktop add dsh-media-gen
 
 # ② GitHub 仓库直装
 dsh plugin --profile desktop add github:EmberwingAviation/dsh-media-gen
 
-# ③ 本地源码（开发用，改源码即生效）
+# ③ 本地源码（开发用，更新后需构建并按宿主流程重新加载）
 dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 ```
 
 **或者用图形界面**：设置 → 内置插件 → **添加插件** → 输入 `dsh-media-gen`（也接受 GitHub 地址或本地目录路径）。
 
 > npm 包页：https://www.npmjs.com/package/dsh-media-gen ｜ 装完可在「设置 → 内置插件」列表看到 `dsh-media-gen` 与版本号
-> 升级：重复执行同一条安装命令即可取到最新版（升级后需重启 DSH）
+> 升级请使用当前 DSH 插件管理器。若提示 already-installed，按管理器要求移除旧包再安装；不要仅靠关闭/开启插件来更新 Host 代码。升级前备份配置。
 
-**2. 完全重启 DSH**（插件在启动时装载）
+**2. 检查安装结果**：支持热加载的 DSH 可直接生效；提示 restart-required 时再重启。设置页仍显示旧版时刷新页面。
 
 **3. 填一个生图供应商** → 设置 → **生图** → 供应商目录卡 → 新建：
 - 名称、Base URL（如 `https://你的中转站/v1`）、API 格式（多数中转站选 `openai-images`）
@@ -49,7 +53,7 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 > 「把这张图做成 5 秒视频」（附图）
 > 「生成一段视频：赛博朋克城市雨夜，镜头缓慢推进」
 
-> ⚠️ **工具只在新建的会话里出现**：DSH 的会话工具集在会话创建时快照，装完插件后请**开新会话**。
+> 工具是否实时更新取决于 DSH 版本和 Agent 预设；当前会话看不到新工具时，新建会话再试。
 
 ---
 
@@ -58,8 +62,10 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 | 工具 | 做什么 |
 |---|---|
 | `image_generate` | 文生图、**参考图改图**（`referenceImages` 传 1–5 张对话里的图）；结果存 `generate/image/` 并**直接显示在对话里** |
-| `generate_video` | 文生视频（异步任务 + 自动轮询）；结果存 `generate/video/`、**对话内播放**，并收录进**视频画廊** |
-| `animate_image` | 图生视频：源图可以是工作区文件、对话附件、或"对话里最新那张图" |
+| `generate_video` | 文生视频；异步提交返回操作 ID，使用查询工具继续取回结果 |
+| `animate_image` | 图生视频：源图可来自工作区或对话附件；以所选协议和模型能力为准 |
+| `query_video_task` | 列出已登记任务、查询进度、恢复下载；不会创建新任务 |
+| `manage_video_models` | 查询/修改模型目录、默认选择、预览请求；修改需目录 revision |
 
 产物都在工作区的 `generate/` 下，随时可再引用；视频还能在会话顶栏的 **视频画廊** 里回看。
 
@@ -82,9 +88,10 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 | `dashscope` | 阿里云通义万相 | ✅ 默认支持 |
 | `volcengine` | 火山引擎 Seedance | ✅ 默认支持 |
 | `google` | Google Veo | ✅ 默认支持 |
-| `openai-compatible` | OpenAI / Sora 风格 `/v1/videos` 异步任务，含各类中转站 | ⚠️ 需手动勾选「支持图生视频」（经 `input_reference` 传图） |
+| `openai-compatible` | `/v1/videos`；参数格式可选 standard / wan / seedance | 按格式与模型配置验证，不能只勾选就开启上游能力 |
+| `custom-json` | 自定义异步 JSON 端点、字段及状态映射 | 需显式能力和 sourceUrl 映射；不支持 Base64 |
 
-同一条通道可配多个模型，默认供应商在设置页单选；单次调用还可用工具参数 `provider` 临时换。
+同一供应商可配多个模型，并独立选择协议与参数格式；单次调用可用 `provider` 和 `model` 切换。当前图片工具输入为本地文件/附件，不能直接使用仅接受公网 URL 的参考素材接口。
 
 ---
 
@@ -139,7 +146,7 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 
 ### 密钥放哪
 
-所有 Key 都交给 DSH 凭据服务（配置里只存引用名），**不会明文写进配置文件、不会传进浏览器、不会进命令行**。
+Key 保存在 DSH 凭据服务，供应商配置与任务记录只保存引用名。服务端不会将已存 Key 返回浏览器；请求预览脱敏。请勿把 Key 放进自定义固定请求头、请求体或公开代码。
 
 ---
 
@@ -159,11 +166,11 @@ node scripts/gen-image.mjs "提示词" [--model qwen-image-3.0-pro] [--size 1024
 
 ## 常见问题
 
-**Q：为什么新会话里才有这三个工具？**
-DSH 的会话工具集在会话创建时快照，装完插件或改了工具开关，**新开一个会话**即可。
+**Q：安装后看不到工具？**
+先检查插件是否 active 和当前 Agent 预设是否开放工具；部分 DSH 版本需要新建会话。v0.2.0 提供三个生成工具及两个视频管理/查询工具。
 
 **Q：报 429 / 限流 / "负载已饱和"怎么办？**
-插件会自动指数退避重试（默认 ≥60 秒起步，最多 3 次），**不要手动连发**；上游拥堵时等一会儿或换个供应商。
+视频查询请求遇限流或网络故障时按 60 秒、120 秒退避；视频创建 POST 不自动重试。生图保留独立退避策略。不要手动连发生成请求。
 
 **Q：视频任务一直转圈？**
 异步视频任务偶尔会长时间停滞（上游排队）。插件会保留任务 id：超时后**先查旧任务**，而不是盲目重提；
@@ -173,10 +180,10 @@ DSH 的会话工具集在会话创建时快照，装完插件或改了工具开�
 工作区 `generate/image/`、`generate/video/`；图片会内联在对话里，视频同时出现在**视频画廊**。
 
 **Q：改了设置要重启吗？**
-改配置（供应商、模型、开关）**不用**重启；安装/升级插件、改插件自身代码需要**重启 DSH**。
+配置修改通常热生效。代码升级是否需要重启由 DSH 插件管理器的安装结果决定；支持 HMR 的宿主可通过移除旧包、安装新版完成模块替换。
 
 **Q：图生视频为什么提示不支持？**
-`openai-compatible` 类型默认关闭图生视频（不同中转站能力不一），到「视频生成」页把该供应商的「支持图生视频」勾上。
+检查模型能力与协议格式。Wan 兼容格式当前只提供文生视频；Seedance 兼容格式不接受本地图片/Base64。能力开关不能绕过接口限制。
 
 ---
 
@@ -190,7 +197,7 @@ DSH 的会话工具集在会话创建时快照，装完插件或改了工具开�
 ## English quick start
 
 ```sh
-dsh plugin --profile desktop add dsh-media-gen   # restart DSH afterwards
+dsh plugin --profile desktop add dsh-media-gen   # follow the manager's activation instructions
 ```
 
 Then go to **Settings → Image generation**: add a provider (Base URL / key / models), pick a default model, and ask the
@@ -198,9 +205,7 @@ agent in a **new session**:
 
 > "Draw a humpback whale breaching at night, movie-poster style"
 
-Three tools are exposed: `image_generate` (text-to-image and reference-image edits), `generate_video` (text-to-video,
-async polling) and `animate_image` (image-to-video). Outputs land in `generate/image/` and `generate/video/`, inline in the
-conversation, with a video gallery tab. Keys are stored through the DSH credential service — never in config files.
+Five tools are exposed: `image_generate`, `generate_video`, `animate_image`, `query_video_task`, and `manage_video_models`. Async video submission returns an operation ID; query that operation to recover progress and results without creating another paid task. Per-model cards support deletion, protocol selection, inherited/overridden/omitted parameters and credential-free request previews. Generated files use `generate/image/` and `generate/video/`. Persistent task records contain credential references, never API key values.
 
 ---
 

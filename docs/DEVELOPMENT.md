@@ -1,83 +1,111 @@
-# dsh-media-gen — 开发文档
+# dsh-media-gen 开发与维护
 
-面向开发者：架构、构建、测试、发布流程、上游契约备忘与已知问题。用户使用说明见 [README.md](../README.md)。
+用户说明见 [README](../README.md)。当前已发布版本 **0.2.0**，发行提交 `151b443`，tag `v0.2.0`。
 
-## 结构
+## 模块结构
 
-```
-lib/index.js            合并 host 入口（单一 loader 条目 media-gen）
-lib/media-config.js     统一 volatile Config + resolveVideoEntry（纯逻辑，可单测）
-lib/image-core.js       生图 host（上游 dsh-image-generation 适配）
-lib/video-core.js       生视频 host（上游 dsh-video-gen 适配 + 登记簿 + 退避）
-lib/video-*.js          视频适配器/共享件（google / shared / reference-image）
-lib/rate-limit.js       限流识别 + 指数退避
-lib/video-tasks.js      任务登记簿（先查旧任务再重提）
-lib/cli-config.js       CLI 镜像构造/原子写
-lib/client-image.js     生图 client（设置页 / 工具视图 / 画廊 RPC）
-lib/client-video.js     视频 client（设置卡 / 工具视图 / 视频画廊 IndexedDB）
-lib/client.js           合并 client 入口（build-client.mjs 生成，勿手改）
-scripts/parts/          patch-client-video.mjs 的替换部件
-vendor/                 上游源码副本 + LICENSE（归属证据）
-```
+| 模块 | 职责 |
+|---|---|
+| `lib/index.js` | Host 组合入口、共享模型管理操作与提示段 |
+| `lib/media-config.js` | Cordis schema、volatile 读取及端点默认值 |
+| `lib/video-model-config.js` | 浏览器安全的目录规范化、旧格式迁移、继承/覆盖/omit |
+| `lib/video-model-manager.js` | UI RPC / Agent 共用管理逻辑、规范化 revision 和预览 |
+| `lib/video-protocol.js` | 原生/兼容/custom-json 请求编译、响应状态映射、脱敏预览；无网络 |
+| `lib/video-http.js` | 单次 POST、安全 GET 退避、有界读取、跨源下载鉴权隔离 |
+| `lib/video-task-store.js` | profile 内原子任务记录、指纹、并发预留与安全摘要 |
+| `lib/video-task-engine.js` | 提交、查询、恢复下载、结构化状态与工作区隔离 |
+| `lib/video-core.js` | 视频工具注册、素材读取、结果展示与视频文件路由 |
+| `lib/video-google.js` | 保留同步 Interactions 适配，不自动重试 POST |
+| `lib/video-shared.js` / `lib/video-tasks.js` | 历史适配器辅助代码及回归兼容；不是新版工具的持久任务执行路径 |
+| `lib/image-core.js` / `lib/rpc-route.js` | 生图与 `/image-gen` RPC，包括共享视频模型管理入口 |
+| `lib/client-video.js` / `lib/client-image.js` | 设置页、工具结果卡与画廊 |
+| `lib/client.js` | 构建产物，勿手改 |
+| `vendor/` / `NOTICE.md` | 上游源码、许可证与归属声明 |
 
 ## 构建与测试
 
 ```sh
-node scripts/patch-client-video.mjs   # 一次性 codemod：vendor 视频 client → 本项目版本（幂等，已入库）
-node scripts/build-client.mjs         # 合并两个 client 半 → lib/client.js（确定性，单模块 IIFE 隔离）
-npm run check                         # node --check 全部模块
-npm test                              # node:test（34 项）
+node scripts/build-client.mjs
+npm run check
+npm test
+git diff --check
 ```
 
-三道回归门：
+v0.2.0 发布时 **180 项测试通过**。测试覆盖完整 Host 启动、模型迁移/删除/保存、真实组件事件、自定义映射安全、状态恢复、跨进程原子预留及无重复 POST。历史提交重试测试仍验证旧辅助函数，不代表新版工具允许自动重提。
 
-1. **import-graph 链接完整性** —— 改文件名漏改导入会直接红（曾因此事故排查数小时）
-2. **限流退避序列 + "非限流不重试"纪律**
-3. **任务登记簿决策表**（completed→复用 / failed→重提 / 进行中→拒绝）
+不要把 `scripts/patch-client-video.mjs` 当作日常构建入口：它是早期从 vendor 生成 client 的迁移脚本。修改客户端后只运行合并构建，并检查产物 diff。
 
-CI（`.github/workflows/test.yml`）在 push/PR 时跑 Node 22/24 矩阵，并校验**构建确定性**：
-`build-client.mjs` 重新生成后 `lib/client.js` 必须与提交内容零差异（防止改了源码忘重建）。
+可通过 `DSH_REAL_TOOLS_URL` 指向匹配 DSH 版本的真实 tools 模块运行 `test/video-tools.test.mjs`，验证 `defineTool` 与注册契约。普通 stub 测试不能替代实际 Host 激活检查。
 
-## 发布流程
+CI 在 Node 22/24 上执行测试，并检查重新构建的客户端与提交产物一致。
 
-1. bump `package.json` 的 `version`
-2. commit + push
-3. GitHub 打 Release（tag `vX.Y.Z`）
-4. `.github/workflows/publish.yml` 自动发布到 npm —— 走 **npm Trusted Publishing（OIDC）**：
-   无需 `NPM_TOKEN`、无需 OTP、自动生成 **provenance（SLSA v1）** 认证
-   - npm 包侧已连：`EmberwingAviation/dsh-media-gen` + `publish.yml`（权限含 npm publish）
-   - 也可在 Actions 页手动 `workflow_dispatch`（注意：版本已存在会失败）
+## 配置版本与共享操作
 
-## CLI 与配置镜像
+- `videoConfigVersion` 缺省按 1 处理；新版保存为 2。
+- v1 支持仅有 `model` 和字符串 `models`；v2 模型对象含 ID、名称、协议/参数格式、overrides、capabilities。
+- v2 显式空目录不会从旧默认模型补回；空目录必须清空 `model`。
+- 供应商默认值 → 模型覆盖 → 调用参数；模型 `omit` 与显式调用同字段冲突时拒绝。
+- 模型名称不决定协议。已有目录迁移保留原协议，不按域名或模型名静默猜测。
+- 管理 revision 对规范化目录稳定排序后计算，兼容 raw 配置与 schema 注入默认值的差异。
+- UI 通过 `/image-gen/video-models` 执行 validate/preview，最终使用配置表单 revision 保存；Agent 管理工具使用同一 Host 管理操作和 configEditor。
+- 不手写 profile 配置来代替管理 API。迁移前应备份配置；用户编辑中的草稿不属于已保存配置。
 
-```sh
-node scripts/gen-image.mjs "提示词" [--model M] [--size S] [--key-env E] [--base B] [--out D] [--config P] [--timeout MS] [--dry-run]
-node scripts/sync-cli-mirror.mjs   # host 未重启（新 RPC 未生效）时，从 profile patch 离线重建镜像
-```
+## 请求协议与约束
 
-- 优先级：命令行 flag > GUI 镜像（`~/.dsh/gen-image.config.json`）> 仓库 `gen-image.config.json` > 内置默认
-- GUI 保存时 host 经 `sync-cli-config` RPC 原子写镜像（只含凭据 ref 名，不含密钥值）
-- `imageLane`：`auto` / `cli` / `tool` / `subagent`，由系统提示词策略段约束 Agent 行为
+内置协议：`openai-compatible`、`dashscope`、`volcengine`、`google`、`custom-json`。
 
-## 中转站契约实测备忘（New API 系网关）
+OpenAI 兼容参数格式：`standard`、`wan`、`seedance`。Wan 兼容使用字符串 `seconds`，Seedance 兼容使用数值 `duration` 和 `metadata.ratio/generate_audio`。原生 DashScope 使用 `input/parameters`；Wan3 首帧为 `input.media[].type=first_frame`，旧 Wan 使用 `input.img_url`，未适配字段明确拒绝。
 
-- 生图：`/v1/images/generations`（OpenAI 形状）；chat 路由携图与 images 路由**限流池独立**，优选 images
-- 生视频：Sora 风格 `POST /v1/videos` → `GET /v1/videos/{id}`；状态词 `queued/in_progress/completed/failed`；
-  成功态 URL 位置实测三种：顶层 `video_url` / `output.video_url` / `metadata.url`（适配器三级兜底）
-- i2v：`input_reference` 传 data URL（网关转存后转发）；非法引用任务 failed 且不计费
-- 拥堵期任务可能长时间停滞（实测 wan 系卡 30% 近一小时）——登记簿 + 20 分钟超时即为此设计
+参考来源：
 
-## 已知问题 / 上游缺陷候选
+- [Wan 3.0 官方 API](https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference)
+- [火山官方任务 API](https://ark.volcengine.com/region:cn-beijing/docs/create-video-generation-task-api)
+- [中转兼容契约样例](https://www.yotopivot.top/docs/)
 
-- **connection RPC 通道在 DSH 0.2.0-rc.2 静默缺失**（本插件 0.1.3 已绕过）：
-  `ctx.inject(['connection'], …)` 拿到的 scoped context 访问不到 `webServer`，connection 服务内部
-  `owner.webServer.register(route)` 因此抛错 → `rpc.handle('/image-gen', …)` 从未注册成功，
-  客户端表现为 `transport failure for /image-gen/models: HTTP 405`
-  （405 = webserver 对"无匹配路由的 POST"的统一响应；GET 才是 404，可用它区分"路由缺失"和"方法不对"）。
-  绕法：`lib/rpc-route.js` 在插件自己的 webServer 上按**同一路径/方法/信封协议**自注册
-  （POST `/{channel}/{endpoint}` + `{type:'client-request',rpcId,method,payload}`），客户端零改动。
-  诊断日志：`~/.dsh/media-gen-rpc.log`
-- **client 图"移除行后再添加行"同步失配**（dsh-client-hmr SSE）：bundle 开关后活页面可能丢 client 行，需整页重载恢复；
-  配套工具插件 `dsh-page-reload`（F5/Ctrl+R 拦截 + 侧栏重载按钮）可免重启自愈
-- **host 模块缓存**：已成功导入的模块不因 bundle 开关重导入 —— host 代码改动需**重启 DSH** 才生效；client 代码改动可经 rebuilt 帧热替换
-- DSH Desktop 壳不提供重载加速器（F5 无效），仅拦截 F12
+不要把中转限制当成模型全球能力。官方文档可抓取性与实际调用验证须分别记录；本次新版没有批量运行付费模型验收。
+
+自定义 JSON 支持端点、字段/类型/枚举映射、响应字段与状态对应；不执行脚本。鉴权只使用凭据引用。任务 ID 编码后拼入同源端点；下载到其他域名不得带供应商鉴权。固定参数与映射冲突、危险对象键、非法 Header、缺少恢复所需字段应在提交前拒绝。
+
+## 任务生命周期
+
+1. 编译并验证请求；使用包含供应商、模型、协议、实际参数及提示词/素材指纹的匹配键。
+2. 在网络 POST 前原子预留操作记录。只有取得新预留的调用可以提交。
+3. 创建 POST 只发送一次。响应丢失或无法取得任务 ID 返回 `submission_unknown`，不得自动重提。
+4. 取得 ID 后返回 `pending`，使用 `query_video_task` 查询。正常查询一次观察状态；网络/429/5xx 安全 GET 采用 60 秒、120 秒退避，不是连续自动轮询。
+5. 上游完成后下载/保存；失败为 `download_pending`。成功持久化后为 `completed`。
+6. 保存关闭、结果只在内存时保留可恢复状态，不能宣称重启后文件仍存在。
+
+状态携带 `operationId`、可用的 `taskId`、最近观察时间和阶段。网络错误不能改成上游失败；未知/404 不自动重提。显式 `resubmit` 新建操作，保留历史记录。
+
+任务记录位于当前 profile 的 `data/dsh-media-gen/tasks`（未使用 profile 时回退至 DSH home 下相应目录）。不保存真实 Key、原始提示词或图片 Base64。跨工作区查询不返回结果路径/素材，也不向当前工作区下载。
+
+目录锁冲突失败关闭。异常崩溃留下 `.write-lock` 时，必须先确认没有存活写进程，再由操作者恢复；不得自动抢锁。坏记录保留并报错，不能当作任务不存在后重提。
+
+Google 现有同步 Interactions 适配没有任务 ID：可以记录提交不确定性并防重提，但无法承诺查询恢复。复杂 HMAC/OAuth、WebSocket、通用 multipart、多步骤素材上传不属于当前 custom-json 支持范围。
+
+## 安装、发布与验证
+
+通过插件管理器安装。支持 HMR 的宿主可移除旧包后重新安装以替换模块；仅开关 bundle 不等于重导入代码。以 `application` 和实际启动状态为准，不把重启当作修复代码缺陷的方法。
+
+发布步骤：
+
+1. 更新版本与用户说明，构建、测试、检查 diff。
+2. 提交并推送，创建 `vX.Y.Z` tag 与 GitHub Release。
+3. `publish.yml` 通过 npm Trusted Publishing/OIDC 发布，无需 token 或 OTP。
+4. 检查 CI 的发布步骤及 npm 精确版本端点。registry 缓存可能延迟，不重复发布同一版本。
+
+v0.2.0 验证记录：
+
+- [Release](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.0)
+- [测试 CI](https://github.com/EmberwingAviation/dsh-media-gen/actions/runs/41422713551)：成功
+- [发布 CI](https://github.com/EmberwingAviation/dsh-media-gen/actions/runs/41422770961)：成功
+- [npm 精确版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.0)：已核实
+- 本地 Host active、模型配置读写与两种兼容格式的无费用预览通过。
+- 页面 Slot 已注册，组件测试通过；实际视觉布局尚未做浏览器自动化验收。
+
+## 排错重点
+
+- HTTP 405 只能说明请求未进入预期路由，不能直接断言 Key 错误。
+- v0.1.6 曾因 `RPC_LOG` 未定义导致整个 Host 插件失败；v0.2.0 包含修复与完整启动回归。
+- 先检查插件 active/failed 及真实异常，再检查路由与上游请求。
+- 日志、预览、任务错误均不输出凭据；不要为诊断打印完整凭据文件。
