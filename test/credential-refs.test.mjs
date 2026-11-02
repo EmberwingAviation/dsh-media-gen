@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseCredentialRefs, missingCredentialMessage } from '../lib/credential-refs.js'
+import { parseCredentialRefs, missingCredentialMessage, missingCredentialError } from '../lib/credential-refs.js'
 
 test('凭据名解析：顶层键形状', () => {
   const text = [
@@ -46,10 +46,24 @@ test('缺凭据报错：列出可用 ref', () => {
   assert.match(msg, /GPT_API_KEY/)
 })
 
-test('缺凭据报错：没有可用 ref 时给出新建指引', () => {
+test('缺凭据报错：没有可用 ref 时只说明库为空（指向由 client 本地化渲染）', () => {
   const msg = missingCredentialMessage('X', [])
   assert.match(msg, /no entries yet/)
-  assert.match(msg, /Settings/)
+  assert.doesNotMatch(msg, /Settings/)
+})
+
+test('结构化错误：携带 ref、候选列表与 code，供 client 本地化渲染', () => {
+  const err = missingCredentialError('DASHSCOPE_API_KEY', ['QWEN_TOB_API_KEY', 'GPT_API_KEY'])
+  assert.equal(err.code, 'missing-credential')
+  assert.equal(err.ref, 'DASHSCOPE_API_KEY')
+  assert.deepEqual(err.available, ['QWEN_TOB_API_KEY', 'GPT_API_KEY'])
+  assert.match(err.message, /DASHSCOPE_API_KEY/)
+})
+
+test('结构化错误：空白 ref 被 trim', () => {
+  const err = missingCredentialError('  X  ', [])
+  assert.equal(err.ref, 'X')
+  assert.deepEqual(err.available, [])
 })
 
 test('缺凭据报错：空 ref 名也给出可读文案', () => {
