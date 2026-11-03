@@ -54,7 +54,7 @@ function setup(extra={}){
  const ctx={effect:fn=>fn(),webServer:{register:()=>()=>{}},tools:{register:tool=>{if(realTools)realTools.ToolRuntime.prototype.register.call({ctx:{},layers:{effect:(_ctx,fn)=>fn({tools:{insert:()=>()=>{}}})}},tool);tools.set(tool.name,tool)}},credentials:{resolve:async()=>{throw Error('Unexpected credential access')}},attachments:{readImage:async()=>({data:Buffer.from('image bytes'),ref:{mediaType:'image/png'}})}}
  const store={list:async()=>[{operationId:'op1',taskId:'t1',status:'pending',model:'m',providerSnapshot:{id:'p'}}],findByTaskId:async id=>id==='t1'?{operationId:'op1'}:null}
  const managed=[]
- applyVideo(ctx,()=>config,{taskEngine:engine,taskStore:store,videoModels:async request=>{managed.push(request);return {revision:'r1',providers:[]}}})
+ applyVideo(ctx,()=>config,{waitOptions:{timeoutMs:0},taskEngine:engine,taskStore:store,videoModels:async request=>{managed.push(request);return {revision:'r1',providers:[]}}})
  const exec={signal:new AbortController().signal,agent:{session:{header:{cwd:process.cwd(),id:'s1'},deriveMessages:()=>[{content:[{type:'image',attachment:{attachmentId:'a1'}}]}]}}}
  return {tools,calls,exec,config,managed}
 }

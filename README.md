@@ -10,9 +10,9 @@
 > multi-provider (OpenAI-compatible relays, DashScope 通义万相, Volcengine Seedance, Google Veo, Sora-style `/v1/videos`),
 > per-model configuration, custom JSON protocols, persistent task recovery, video gallery, MIT.
 
-**当前版本：[v0.2.0](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.0)** · [npm 安装版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.0)
+**当前版本：[v0.2.1](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.1)** · [npm 安装版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.1)
 
-本版新增模型独立配置与删除、供应商高级映射、无费用请求预览，以及跨会话任务查询恢复。
+本版修复凭据创建和模型拉取流程，增加视频页独立 API Key 密码输入、覆盖确认和错误脱敏；视频生成默认持续等待完成后交付，超时/停止仍保留原任务。模型独立配置、自定义映射和无费用预览继续保留。
 
 ---
 
@@ -130,7 +130,7 @@ dsh plugin --profile desktop add link:/path/to/dsh-media-gen
 
 点击模型的**请求预览**可查看最终请求和解析规则，预览不发送网络请求、不产生生成费用。原生协议与中转兼容格式不能混用；模型 ID 相同也不代表端点和参数结构相同。
 
-**任务恢复：** 新的异步生成请求提交后返回 `pending` 和本地 `operationId`，用 `query_video_task` 查询或取回视频。任务记录保存在当前 profile 的 `data/dsh-media-gen/tasks`，重启后仍可查询；不存 API Key 或参考图 Base64。不同工作区的查询不会把原任务文件写到当前工作区。
+**任务恢复：** 生成工具提交异步任务后默认持续等待并查询原任务，完成后下载、保存并返回视频。只有等待超时、停止或无法自动继续时才返回 `pending` 等可恢复状态和本地 `operationId`；可用 `query_video_task` 继续查询或取回视频。任务记录保存在当前 profile 的 `data/dsh-media-gen/tasks`，重启后仍可查询；不存 API Key 或参考图 Base64。不同工作区的查询不会把原任务文件写到当前工作区。
 
 | 返回状态 | 含义 |
 |---|---|

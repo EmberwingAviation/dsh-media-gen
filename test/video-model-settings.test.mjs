@@ -45,7 +45,7 @@ function harness({ accepted = true, validateError = false } = {}) {
     useRef(initial) { const i = index++; return states[i] ??= { current: initial } }, useEffect() {},
   }
   const component = load(react).VideoGenerationSettingsCard
-  const initial = { videoConfigVersion: 2, videoProviders: [{ id: 'relay', name: 'Relay', kind: 'openai-compatible', model: 'old', models: [{ id: 'old', name: 'Old', protocol: 'google', overrides: { seed: { mode: 'omit' } }, capabilities: {} }] }] }
+  const initial = { videoConfigVersion: 2, videoProviders: [{ id: 'relay', name: 'Relay', apiKeyEnv: 'TEST_VIDEO_KEY', kind: 'openai-compatible', model: 'old', models: [{ id: 'old', name: 'Old', protocol: 'google', overrides: { seed: { mode: 'omit' } }, capabilities: {} }] }] }
   const props = { scope: { getSnapshot: () => ({ value: initial, revision: 'r1', writable: true }), mutate: async (ops, revision) => { writes.push({ ops: plain(ops), revision }); return accepted } }, locale: { getSnapshot: () => ({ active: 'zh' }) }, credentials: {}, rpc: { call: async (route, method, input) => { calls.push({ route, method, input }); if (method === 'models') return { ok: true, value: { ids: ['old', 'new', 'new'] } }; if (input.action === 'validate') return validateError ? { ok: false, error: { message: 'Invalid provider' } } : { ok: true, value: input.provider }; return { ok: true, value: { safe: true } } } } }
   const render = () => { index = 0; tree = component(props) }
   const nodes = () => { const out = []; const walk = node => { if (typeof node !== 'object') return; out.push(node); node.children.forEach(walk) }; walk(tree); return out }

@@ -43,6 +43,14 @@ test('merged host starts, serves RPC, registers all tools and disposes routes', 
   assert.equal(envelope.rpcId, 'startup-test')
   assert.equal(envelope.result.ok, false)
   assert.match(envelope.result.error.message, /baseUrl/)
+  for (const apiKeyEnv of ['sk-test-not-a-real-key', 'sk_fake_secret', '', 'bad ref']) {
+    const bad = Readable.from([Buffer.from(JSON.stringify({type:'client-request',rpcId:'redaction',method:'models',payload:{baseUrl:'https://example.invalid/v1',apiKeyEnv}}))])
+    Object.assign(bad,{method:'POST',url:'/image-gen/models',headers:{host:'localhost'}})
+    await route.handler(bad,res)
+    assert.equal(JSON.parse(body).result.ok,false)
+    assert.match(JSON.parse(body).result.error.message,/凭据名称/)
+    if(apiKeyEnv) assert.ok(!body.includes(apiKeyEnv),'Never echo an invalid credential or pasted secret')
+  }
   for (const dispose of disposers.reverse()) dispose?.()
   assert.equal(routes.size, 0)
 })
