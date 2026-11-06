@@ -5,6 +5,11 @@ import vm from 'node:vm'
 const source=readFileSync(new URL('../lib/client-image.js',import.meta.url),'utf8')
 // Extract actual helper declarations, without loading unrelated UI modules.
 const helper=source.slice(source.indexOf('    async function fetchUpstreamModelsIntoDraft'),source.indexOf('    const API_FORMATS'))
+test('both existing and new provider editors receive the credential service',()=>{
+ const calls=[...source.matchAll(/React\.createElement\(ProviderEditor,\s*\{([^}]*?)(?=onCancel:)/g)]
+ assert.equal(calls.length,2)
+ for(const call of calls) assert.match(call[1],/\bcredentials\s*,/)
+})
 const naming=source.slice(source.indexOf('    function slugify('),source.indexOf('    function uniqueId('))
 function setup(call,confirm=true){
  const alerts=[];const scope={IMAGE_RPC:{call},RPC_CHANNEL:'/image-gen',window:{alert:x=>alerts.push(x),confirm:()=>confirm}}

@@ -10,9 +10,9 @@
 > multi-provider (OpenAI-compatible relays, DashScope 通义万相, Volcengine Seedance, Google Veo, Sora-style `/v1/videos`),
 > per-model configuration, custom JSON protocols, persistent task recovery, video gallery, MIT.
 
-**当前版本：[v0.2.1](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.1)** · [npm 安装版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.1)
+**当前版本：[v0.2.2](https://github.com/EmberwingAviation/dsh-media-gen/releases/tag/v0.2.2)** · [npm 安装版本](https://www.npmjs.com/package/dsh-media-gen/v/0.2.2)
 
-本版修复凭据创建和模型拉取流程，增加视频页独立 API Key 密码输入、覆盖确认和错误脱敏；视频生成默认持续等待完成后交付，超时/停止仍保留原任务。模型独立配置、自定义映射和无费用预览继续保留。
+本版修复生图供应商编辑框缺少凭据服务连接的问题：填写 API Key 后，可确认创建凭据并继续拉取模型，不再因创建操作无法执行而反复提示“还没有存 Key”。新建和编辑已有供应商均已覆盖，195 项测试通过。视频等待交付、模型独立配置、自定义映射和请求预览继续保留。
 
 ---
 
